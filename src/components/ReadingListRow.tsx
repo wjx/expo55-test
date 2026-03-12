@@ -88,8 +88,7 @@ export function ReadingListRow({
           </View>
         </View>
         <View style={styles.rightSection}>
-          <StatusIndicator isRead={item.isRead} />
-          {item.isFavorite && <Text style={styles.star}>★</Text>}
+          <StatusIndicator isRead={item.isRead} isFavorite={item.isFavorite} readTime={item.readTime} />
         </View>
       </Pressable>
 

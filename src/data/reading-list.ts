@@ -10,7 +10,7 @@ export interface ReadingListItem {
 
 export const SWIPE_THRESHOLD = -80;
 
-export const readingList: ReadingListItem[] = Array.from({ length: 40 }, (_, i) => ({
+export const readingList: ReadingListItem[] = Array.from({ length: 80 }, (_, i) => ({
   id: `item-${i}`,
   title: [
     'Understanding React Native Performance',
