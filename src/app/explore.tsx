@@ -61,8 +61,8 @@ export default function ExploreScreen() {
           </View>
 
           {/* No virtualization — all 40 rows rendered simultaneously = max pain */}
-          {readingList.map((item) => (
-            <ReadingListRow key={item.id} item={item} />
+          {readingList.map((item, index) => (
+            <ReadingListRow key={item.id} item={item} index={index} />
           ))}
 
           {Platform.OS === 'web' && <WebBadge />}

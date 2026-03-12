@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { StatusIndicator } from '@/components/StatusIndicator';
 import { SWIPE_THRESHOLD, type ReadingListItem } from '@/data/reading-list';
@@ -12,18 +18,47 @@ import { SWIPE_THRESHOLD, type ReadingListItem } from '@/data/reading-list';
  *
  * Issue 2: Unused `scale` shared value that's still tracked in useAnimatedStyle transform.
  * Creates 40 wasted shared values that Reanimated must track on the UI thread.
+ *
+ * Issue 3: Staggered entrance animation per row — each row runs withDelay + withTiming/withSpring
+ * on mount, creating 40 concurrent entrance animations that compound the overhead.
  */
-export function ReadingListRow({ item }: { item: ReadingListItem }) {
+export function ReadingListRow({
+  item,
+  index = 0,
+}: {
+  item: ReadingListItem;
+  index?: number;
+}) {
   const translateX = useSharedValue(0);
 
-  // Issue 2: scale is never animated/changed but is referenced in useAnimatedStyle below
+  // Entrance animation shared values (per-row overhead)
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+  // Issue 2: scale is never animated/changed but is referenced in entranceStyle below
   const scale = useSharedValue(1);
+
+  // Staggered entrance animation — 40 rows × 50ms stagger = significant animation overhead
+  useEffect(() => {
+    const delay = index * 50;
+    opacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
+    translateY.value = withDelay(
+      delay,
+      withSpring(0, { damping: 20, stiffness: 200 }),
+    );
+  }, []);
+
+  // Issue 2 + 3: entranceStyle tracks opacity, translateY, AND scale (scale never changes from 1)
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
 
   // Issue 1: This animated style recalculates every frame for every row
   const rightActionsStyle = useAnimatedStyle(() => ({
-    opacity: translateX.value < SWIPE_THRESHOLD ? 1 : 0,
-    // Issue 2: scale.value is tracked here but never changes from 1
-    transform: [{ scale: scale.value }],
+    opacity:
+      translateX.value < 0
+        ? Math.min(1, -translateX.value / SWIPE_THRESHOLD)
+        : 0,
   }));
 
   const categoryColors: Record<string, string> = {
@@ -34,7 +69,7 @@ export function ReadingListRow({ item }: { item: ReadingListItem }) {
   };
 
   return (
-    <View style={styles.rowContainer}>
+    <Animated.View style={[styles.rowContainer, entranceStyle]}>
       <Pressable style={styles.rowContent}>
         <View style={styles.leftSection}>
           <View
@@ -67,7 +102,7 @@ export function ReadingListRow({ item }: { item: ReadingListItem }) {
           <Text style={styles.actionText}>Archive</Text>
         </View>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
