@@ -10,7 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import { Trash2, Share2 } from 'lucide-react-native';
+
 import { StatusIndicator } from '@/components/StatusIndicator';
+import { CoverImage } from '@/components/CoverImage';
 import { SWIPE_THRESHOLD, type ReadingListItem } from '@/data/reading-list';
 
 const ACTION_WIDTH = 120;
@@ -101,8 +104,13 @@ export function ReadingListRow({
         <Animated.View style={swipeStyle}>
           <Pressable style={styles.rowContent}>
             <View style={styles.leftSection}>
-              {/* Fake cover image placeholder — 64x64 rounded rect to increase render cost */}
-              <View style={styles.coverPlaceholder} />
+              {/* Heavy cover: LinearGradient + AnimatedBlurView + SVG icon per row */}
+              <CoverImage
+                title={item.title}
+                id={item.id}
+                size={64}
+                isProcessing={!item.isRead}
+              />
               <View
                 style={[
                   styles.categoryDot,
@@ -133,11 +141,13 @@ export function ReadingListRow({
 
       {/* Issue 1: Always rendered even when not swiping — 40 animated opacity hooks active */}
       <Animated.View style={[styles.rightActions, rightActionsStyle]}>
-        <View style={[styles.actionButton, { backgroundColor: '#ef4444' }]}>
-          <Text style={styles.actionText}>Delete</Text>
-        </View>
         <View style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}>
-          <Text style={styles.actionText}>Archive</Text>
+          <Share2 size={20} color="#FFFFFF" />
+          <Text style={styles.actionText}>Share</Text>
+        </View>
+        <View style={[styles.actionButton, { backgroundColor: '#ef4444' }]}>
+          <Trash2 size={20} color="#FFFFFF" />
+          <Text style={styles.actionText}>Delete</Text>
         </View>
       </Animated.View>
     </Animated.View>
@@ -162,12 +172,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     gap: 12,
-  },
-  coverPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: '#e5e7eb',
   },
   categoryDot: {
     width: 10,
