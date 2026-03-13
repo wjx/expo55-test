@@ -6,10 +6,14 @@ import Animated, {
   withDelay,
   withTiming,
   withSpring,
+  runOnJS,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { StatusIndicator } from '@/components/StatusIndicator';
 import { SWIPE_THRESHOLD, type ReadingListItem } from '@/data/reading-list';
+
+const ACTION_WIDTH = 120;
 
 /**
  * Issue 1: Always-rendered Animated.View with useAnimatedStyle for right actions opacity.
@@ -30,6 +34,7 @@ export function ReadingListRow({
   index?: number;
 }) {
   const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
 
   // Entrance animation shared values (per-row overhead)
   const opacity = useSharedValue(0);
@@ -61,6 +66,28 @@ export function ReadingListRow({
         : 0,
   }));
 
+  // Pan gesture for swipe-to-reveal actions — adds per-row gesture overhead
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .onStart(() => {
+      startX.value = translateX.value;
+    })
+    .onUpdate((event) => {
+      const next = startX.value + event.translationX;
+      translateX.value = Math.min(0, Math.max(-ACTION_WIDTH, next));
+    })
+    .onEnd((event) => {
+      if (translateX.value < SWIPE_THRESHOLD) {
+        translateX.value = withSpring(-ACTION_WIDTH, { damping: 20, stiffness: 200 });
+      } else {
+        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+      }
+    });
+
+  const swipeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
   const categoryColors: Record<string, string> = {
     article: '#3b82f6',
     tutorial: '#8b5cf6',
@@ -70,27 +97,39 @@ export function ReadingListRow({
 
   return (
     <Animated.View style={[styles.rowContainer, entranceStyle]}>
-      <Pressable style={styles.rowContent}>
-        <View style={styles.leftSection}>
-          <View
-            style={[
-              styles.categoryDot,
-              { backgroundColor: categoryColors[item.category] ?? '#999' },
-            ]}
-          />
-          <View style={styles.textContainer}>
-            <Text style={styles.title} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={styles.subtitle}>
-              {item.author} · {item.readTime} min
-            </Text>
-          </View>
-        </View>
-        <View style={styles.rightSection}>
-          <StatusIndicator isRead={item.isRead} isFavorite={item.isFavorite} readTime={item.readTime} />
-        </View>
-      </Pressable>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={swipeStyle}>
+          <Pressable style={styles.rowContent}>
+            <View style={styles.leftSection}>
+              {/* Fake cover image placeholder — 64x64 rounded rect to increase render cost */}
+              <View style={styles.coverPlaceholder} />
+              <View
+                style={[
+                  styles.categoryDot,
+                  { backgroundColor: categoryColors[item.category] ?? '#999' },
+                ]}
+              />
+              <View style={styles.textContainer}>
+                <Text style={styles.title} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.subtitle}>
+                  {item.author} · {item.readTime} min
+                </Text>
+                <Text style={styles.metaDate}>
+                  Added Mar {((index * 7) % 28) + 1}, 2026
+                </Text>
+                <Text style={styles.metaDuration}>
+                  Est. {item.readTime} min · {item.category}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.rightSection}>
+              <StatusIndicator isRead={item.isRead} isFavorite={item.isFavorite} readTime={item.readTime} />
+            </View>
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
 
       {/* Issue 1: Always rendered even when not swiping — 40 animated opacity hooks active */}
       <Animated.View style={[styles.rightActions, rightActionsStyle]}>
@@ -124,6 +163,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
   },
+  coverPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    backgroundColor: '#e5e7eb',
+  },
   categoryDot: {
     width: 10,
     height: 10,
@@ -141,6 +186,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6b7280',
     marginTop: 2,
+  },
+  metaDate: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  metaDuration: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 1,
   },
   rightSection: {
     flexDirection: 'row',
