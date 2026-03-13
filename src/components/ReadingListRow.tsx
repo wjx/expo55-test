@@ -99,7 +99,7 @@ export function ReadingListRow({
   };
 
   return (
-    <Animated.View style={[styles.rowContainer, entranceStyle]}>
+    <Animated.View style={[styles.rowContainer, entranceStyle]} className="bg-white dark:bg-gray-900">
       <GestureDetector gesture={panGesture}>
         <Animated.View style={swipeStyle}>
           <Pressable style={styles.rowContent}>

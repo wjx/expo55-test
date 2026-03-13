@@ -1,5 +1,6 @@
-import React from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,16 +9,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { readingList } from '@/data/reading-list';
+import { readingList, type ReadingListItem } from '@/data/reading-list';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * Explore tab — Reading List with intentional performance anti-patterns:
+ * Explore tab — Reading List using FlatList (matches dev1's read-list.tsx).
  *
- * 1. No virtualization: all 40 ReadingListRow items rendered in a plain ScrollView
- * 2. Each row has an always-active useAnimatedStyle for swipe actions opacity (40 hooks)
- * 3. Each row has an unused useSharedValue(scale) tracked in useAnimatedStyle (40 wasted)
- * 4. StatusIndicator uses className on RN components instead of proper styling
+ * FlatList virtualizes native views (lighter UI thread), but JS thread handles
+ * className resolution, non-memo'd components, and per-row state/gesture rebuilds.
  */
 export default function ExploreScreen() {
   const safeAreaInsets = useSafeAreaInsets();
@@ -40,34 +39,43 @@ export default function ExploreScreen() {
     },
   });
 
+  const renderItem = useCallback(({ item, index }: { item: ReadingListItem; index: number }) => (
+    <ReadingListRow item={item} index={index} />
+  ), []);
+
+  const keyExtractor = useCallback((item: ReadingListItem) => item.id, []);
+
+  const ListHeader = (
+    <ThemedView style={styles.container}>
+      <ThemedView style={styles.titleContainer}>
+        <ThemedText type="subtitle">Reading List</ThemedText>
+        <ThemedText style={styles.centerText} themeColor="textSecondary">
+          Your saved articles, tutorials, and more.
+        </ThemedText>
+      </ThemedView>
+
+      <View style={styles.listHeader}>
+        <Text style={[styles.listHeaderText, { color: theme.textSecondary }]}>
+          {readingList.length} items
+        </Text>
+      </View>
+    </ThemedView>
+  );
+
+  const ListFooter = Platform.OS === 'web' ? <WebBadge /> : null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ScrollView
+      <Animated.FlatList
+        data={readingList}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
         style={[styles.scrollView, { backgroundColor: theme.background }]}
         contentInset={insets}
-        contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-        <ThemedView style={styles.container}>
-          <ThemedView style={styles.titleContainer}>
-            <ThemedText type="subtitle">Reading List</ThemedText>
-            <ThemedText style={styles.centerText} themeColor="textSecondary">
-              Your saved articles, tutorials, and more.
-            </ThemedText>
-          </ThemedView>
-
-          <View style={styles.listHeader}>
-            <Text style={[styles.listHeaderText, { color: theme.textSecondary }]}>
-              {readingList.length} items
-            </Text>
-          </View>
-
-          {/* No virtualization — all 40 rows rendered simultaneously = max pain */}
-          {readingList.map((item, index) => (
-            <ReadingListRow key={item.id} item={item} index={index} />
-          ))}
-
-          {Platform.OS === 'web' && <WebBadge />}
-        </ThemedView>
-      </ScrollView>
+        contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -77,12 +85,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   container: {
     maxWidth: MaxContentWidth,
     flexGrow: 1,
+    width: '100%',
   },
   titleContainer: {
     gap: Spacing.three,
